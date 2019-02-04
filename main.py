@@ -10,8 +10,7 @@
 	----implementado
 	* Jogo da memoria
 	* banco de dados com placar 
-	*
-	
+	* Quiz
 '''
 from kivy.app import App
 from kivy.uix.button import Button
@@ -33,22 +32,15 @@ from kivy.graphics import Color, Rectangle, Ellipse
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.textinput import TextInput
 from kivy.logger import LoggerHistory
+from functools import partial
+from threading import Thread
+from kivy.core.window import Window
 import sqlite3
 import os
 import time
 import random
 import json
 import os
-
-# soh tirar quando for compilar
-# adc vibracao aos botoes
-# try:
-# 	from jnius import autoclass
-
-# except KeyError:
-# 	os.environ['JDK_HOME'] = "/usr/lib/jvm/java-8-openjdk-amd64"
-# 	os.environ['JAVA_HOME'] = "/usr/lib/jvm/java-8-openjdk-amd64"
-# 	from jnius import autoclass
 
 #Variaveis globais
 tempo = 0
@@ -59,16 +51,20 @@ pontos = 0
 inicio = 0
 fim = 0
 flag = 0
-erro = 0
+erros = 0
 nome = ''
 ident = []
+Memo_fechar = []
+
 
 #globais do quiz
 quiz_inicial = 0
 quiz_final = 0
 quiz_nome = ''
 quiz_pontos = 0
-
+quiz_fechar = []
+five_caixas = []
+visit = []
 ''' 
 	*lembrar
 	*	nao se esquecer que compila em python 2 (VM-buildozer)
@@ -76,6 +72,9 @@ quiz_pontos = 0
 	*	acerto.jpeg eh usado apenas como marcacao de acerto, nao eh uma imagem
 	*
 '''
+
+Clock.max_iteration = 30
+
 class Gerenciador(ScreenManager):#gerenciador de telas
 	def __init__(self,**kwargs):
 		super(Gerenciador,self).__init__(**kwargs)
@@ -100,7 +99,7 @@ class Inserenome(BoxLayout):
 			banco = sqlite3.connect('teste.db')
 			c = banco.cursor()
 			c.execute('''CREATE TABLE IF NOT EXISTS rank (nome text, pontos integer, tempo real, erros integer)''')
-			parametros = (nome,pontos,tempo,erro)
+			parametros = (nome,pontos,tempo,erros)
 			c.execute("INSERT INTO rank VALUES (?,?,?,?)",parametros)
 			banco.commit()
 			nome = ''
@@ -108,28 +107,57 @@ class Inserenome(BoxLayout):
 class Menu(Screen):
 	def __init__(self,**kwargs):
 		super(Menu,self).__init__(**kwargs)
-
-class Pronto(BoxLayout):
-	def __init__(self,**kwargs):
-		super(Pronto,self).__init__(**kwargs)
-
-class Teste(Screen):
-	
-	def __init__(self,**kwargs):
-		super(Teste,self).__init__(**kwargs)
-	def on_pre_enter(self):
-		banco = sqlite3.connect('quiz.db')
-		c = banco.cursor()
-		c.execute('''CREATE TABLE IF NOT EXISTS rank (nome text,pontos integer,tempo real)''')
-		dump = c.execute("SELECT nome,pontos,tempo from rank order by tempo asc limit 3")##conta os de cima
-		j = dump.fetchall()
-
+	def on_enter(self):
 		
+		a = Thread(target = Quiz().dp_enter(),args = [])
+		a.start()
+
+class Quiz(Screen):
+	temp = []
+	rank_inic = []
+	def __init__(self,**kwargs):
+		super(Quiz,self).__init__(**kwargs)
+		
+	# def on_pre_enter(self):
+	# 	Clock.schedule_once(lambda dt: self.pra_enter(self),0.3)
+	# def on_pre_enter(self):
+	# 	a = Thread(target = self.dp_enter,args = [self])
+	# 	a.start()
+	def on_enter(self, *args):			
+		self.constroi_3rank()
+		b = Thread(target = self.carregaWidgetsF, args = [self])
+		b.start()
 		box = BoxLayoutCustom2()
 		box.cor = 0.10,0.05,0,0
 		box.add_widget(LabelBotao(text='Os 3 melhores no quiz',color=(0,0,0,1)))
 		#MyLabel(text='Os 3 melhores',size_hint_y=None,height='60dp')
 		self.ids.qg.add_widget(box)
+	def constroi_3rank(self):
+		for widget in self.rank_inic:
+			self.ids.qf.add_widget(widget)
+	def mov(self,id = 0,arg='',*args):
+		global five_caixas,visit
+		# print(visit)
+		# print("mov")
+		# print(id)
+		scroll_quiz = arg.parent.parent
+		visit[id] = 1
+		for j in range(5):
+			if(visit[j] != 1):
+				scroll_quiz.scroll_to(five_caixas[j])
+				break
+			
+	def dp_enter(self, *args):#terminada a animacao de entrada na tela
+
+		self.__class__.rank_inic = []
+		banco = sqlite3.connect('quiz.db')
+		c = banco.cursor()
+		c.execute('''CREATE TABLE IF NOT EXISTS rank (nome text,pontos integer,tempo real)''')
+		dump = c.execute("SELECT nome,pontos,tempo from rank order by pontos desc, tempo asc limit 3")##conta os de cima
+		
+		j = dump.fetchall()
+		
+		
 		
 		box = BoxLayoutCustom2()
 		box.cor = 0.10,0.05,0,.9
@@ -139,37 +167,51 @@ class Teste(Screen):
 		box.add_widget(Tarefa_two(text='Tempo'))
 		
 	
-		
-		self.ids.qf.add_widget(box)
+		self.__class__.rank_inic.append(box)
+		#self.ids.qf.add_widget(box)
 		ind = 1
 		cor = 0.10,0.05,0,.8
-		for dumps in j:
+		#print(j)
+		if (len(j) != 0):
+			
+			for dumps in j:
+				#print(dumps)
+				box = BoxLayoutCustom2()
+				if (ind % 2 == 0):
+					cor = [0.30,0.14,0,1]
+				else:
+					cor = [0.30,0.14,0,.3]
+				
+				box.cor = cor
+				
+				box.add_widget(Tarefa_two(text=str(ind)))#posicao
+				box.add_widget(Tarefa_two(text=dumps[0]))#nome
+				box.add_widget(Tarefa_two(text=str(dumps[1])))#pontos
+				box.add_widget(Tarefa_two(text=str(dumps[2])+'s'))#tempo
+				self.__class__.rank_inic.append(box)
+				#self.ids.qf.add_widget(box)
+				ind+=1
+		else:
 			box = BoxLayoutCustom2()
-			if (ind % 2 == 0):
-				cor = [0.30,0.14,0,1]
-			else:
-				cor = [0.30,0.14,0,.3]
+			box.cor = [0.30,0.14,0,.3]
+			box.add_widget(Tarefa_two(text=str(1)))
+			box.add_widget(Tarefa_two(text=str("Muhna")))
+			box.add_widget(Tarefa_two(text=str("2019")))
+			box.add_widget(Tarefa_two(text=str(0.1)+'s'))
+			self.__class__.rank_inic.append(box)
+			#self.ids.qf.add_widget(box)
 			
-			box.cor = cor
-			
-			box.add_widget(Tarefa_two(text=str(ind)))
-			box.add_widget(Tarefa_two(text=str(dumps[0])))
-			box.add_widget(Tarefa_two(text=str(dumps[1])))
-			box.add_widget(Tarefa_two(text=str(dumps[2])+'s'))
-			self.ids.qf.add_widget(box)
-			ind+=1
 
 	def previous_screen_limpa(self, *args):
 	
-		global pontos,qtdimagens,erro,tempo,inicio,fim
-
+		global quiz_pontos
 		self.manager.transition.direction = 'right'
 		self.manager.current = 'menu'
 		self.manager.transition.bind(on_complete=self.restart_limpa)
 		
 		# for key,val in self.ids.items():
 		#  	print("key={0}, val={1}".format(key,val))
-		Pergunta.pontos = 0
+		quiz_pontos = 0
 
 	def restart_limpa(self,  *args):
 		global contador,texto
@@ -181,15 +223,30 @@ class Teste(Screen):
 
 	def limpatela(self,*args):#botao recomecar, limpa a tela e cria uma nova tela		
 		self.parent.remove_widget(self)
-		teste = Teste(name='teste')
-		self.parent.add_widget(teste)
+		quiz = Quiz(name='quiz')
+		self.parent.add_widget(quiz)
+		
+		Pergunta().clear()
+	
 	def carregaWidgets(self):
-		global quiz_inicial
+		box = Loading()
+		self.ids.qz.add_widget(box)
+		Clock.schedule_once(lambda dt: self.carregaWidgetsF(self),0.3)#talvez 0.1
+		a = Thread(target = self.carregaWidgetsF,args = [self])
+		Clock.schedule_once(lambda dt: a.start(),0.1)
+		print("Iniciou")
+	def carregaWidgetsF(self,*args):
+		global quiz_inicial, five_caixas,visit
+		self.temp = []
+		visit = [0]*5
 
+		five_caixas = []
+		
 		conteudo = open('quiz.json').read()
 		arquivos = json.loads(conteudo)
 		#print(arquivos[19])
-		
+		cont = 0
+		#self.ids.qz.clear_widgets()
 		for j in range(5):	
 			selecionado = random.choice(arquivos)
 			#print(selecionado)
@@ -216,9 +273,27 @@ class Teste(Screen):
 			arquivos.remove(selecionado)
 			#print(adc)
 			adc.append(j)
-			self.ids.qz.add_widget(Pergunta(pergunta=pergunta,args=adc))
-			quiz_inicial = time.time() 
 
+
+			new_perg = Pergunta(pergunta=pergunta,args=adc,id=cont)#quadro com pergunta e possiveis respostas
+			self.temp.append(new_perg)
+
+			five_caixas.append(new_perg)
+			# self.ids.qz.add_widget(temp)
+
+			cont+=1
+			
+			#Clock.schedule_once(self.printa,0.1)#mostra os id dos widgets
+		# quiz_inicial = time.time()
+	def constroi(self):#coloca os widget de pergunta na tela do quiz
+		global quiz_inicial
+		
+		for widget in self.temp:
+			self.ids.qz.add_widget(widget)
+		quiz_inicial = time.time()
+
+	def desconstroi(self,*args):#remove todos os widgets da tela do quiz
+		self.ids.qz.clear_widgets()
 		
 
 class MyLabel(Image):#redimensiona os textos
@@ -233,17 +308,6 @@ class MyLabel(Image):#redimensiona os textos
 		# Set it to image, it'll be scaled to image size automatically:
 		self.texture = l.texture
 
-class Quiz(Screen):#tela do quiz
-	def __init__(self,**kwargs):
-		super(Quiz,self).__init__(**kwargs)
-	def previous_screen(self, *args):
-		self.manager.transition.direction = 'right'
-		self.manager.current = 'menu'
-		self.manager.transition.bind(on_complete=self.restart)
-	
-	def restart(self,  *args):
-		self.manager.transition.direction = 'left'
-		self.manager.transition.unbind(on_complete=self.restart)
 class GridLayout_custom(GridLayout):
 	def __init__(self,**kwargs):
 		super(GridLayout_custom,self).__init__(**kwargs)
@@ -252,11 +316,12 @@ class Jogo(Screen):#Tela do jogo da memoria
 	def __init__(self,**kwargs):
 		super(Jogo,self).__init__(**kwargs)
 
-	def on_pre_enter(self):
+	def on_enter(self):#terminada a animacao de entrada na tela
+		
 		banco = sqlite3.connect('teste.db')
 		c = banco.cursor()
 		c.execute('''CREATE TABLE IF NOT EXISTS rank (nome text,pontos integer,tempo real,erros integer)''')
-		dump = c.execute("SELECT nome,pontos,tempo,erros from rank order by tempo asc limit 3")##conta os de cima
+		dump = c.execute("SELECT nome,pontos,tempo,erros from rank order by pontos desc , erros asc ,tempo asc limit 3")##conta os de cima
 		j = dump.fetchall()
 
 		
@@ -272,28 +337,44 @@ class Jogo(Screen):#Tela do jogo da memoria
 		box.add_widget(Tarefa_two(text='Nome'))
 		box.add_widget(Tarefa_two(text='Pontos'))
 		box.add_widget(Tarefa_two(text='Tempo'))
-		box.add_widget(Tarefa_two(text='Erros'))
+		box.add_widget(Tarefa_two(text='erros'))
 		
 	
 		
 		self.ids.tbox2.add_widget(box)
 		ind = 1
 		cor = 0.10,0.05,0,.8
-		for dumps in j:
-			box = BoxLayoutCustom2()
-			if (ind % 2 == 0):
-				cor = [0.30,0.14,0,1]
-			else:
-				cor = [0.30,0.14,0,.3]
-			
-			box.cor = cor
-			box.add_widget(Tarefa_two(text=str(ind)))
-			box.add_widget(Tarefa_two(text=str(dumps[0])))
-			box.add_widget(Tarefa_two(text=str(dumps[1])))
-			box.add_widget(Tarefa_two(text=str(dumps[2])+'s'))
-			box.add_widget(Tarefa_two(text=str(dumps[3])))
-			self.ids.tbox2.add_widget(box)
-			ind+=1
+		if (len(j) != 0):
+			for dumps in j:
+				box = BoxLayoutCustom2()
+				if (ind % 2 == 0):
+					cor = [0.30,0.14,0,1]
+				else:
+					cor = [0.30,0.14,0,.3]
+				
+				box.cor = cor
+				box.add_widget(Tarefa_two(text=str(ind)))#posicao
+				box.add_widget(Tarefa_two(text=dumps[0]))#nome
+				box.add_widget(Tarefa_two(text=str(dumps[1])))#pontos
+				box.add_widget(Tarefa_two(text=str(dumps[2])+'s'))#tempo
+				box.add_widget(Tarefa_two(text=str(dumps[3])))#erros
+				self.ids.tbox2.add_widget(box)
+				ind+=1
+		else:
+			pnt = 2019
+			tmp = 1
+			for i in range(3):
+				box = BoxLayoutCustom2()
+				box.cor = [0.30,0.14,0,.3]
+				box.add_widget(Tarefa_two(text=str('-')))
+				box.add_widget(Tarefa_two(text=str('-')))
+				box.add_widget(Tarefa_two(text=str('-')))
+				box.add_widget(Tarefa_two(text=str('-')))
+				box.add_widget(Tarefa_two(text=str('-')))
+				self.ids.tbox2.add_widget(box)
+				tmp += 1
+				pnt -= 1
+
 	def addImagem(self,valor):#adc os widgets com o text contendo os nomes das imagens		
 		global inicio
 		global qtdimagens
@@ -308,6 +389,7 @@ class Jogo(Screen):#Tela do jogo da memoria
 		random.shuffle(result)#result foi embaralhado
 
 		self.ids.gridlayout.size_hint_y = 1
+
 		for j in range(valor):
 			selecionado = random.choice(result)#sorteia um item do vetor
 			selecionadoT = random.choice(nova)#sorteia um item do vetor
@@ -334,12 +416,12 @@ class Jogo(Screen):#Tela do jogo da memoria
 	
 	def previous_screen_limpa(self, *args):
 	
-		global pontos,qtdimagens,erro,tempo,inicio,fim
+		global pontos,qtdimagens,erros,tempo,inicio,fim
 
 		self.manager.transition.direction = 'right'
 		self.manager.current = 'menu'
 		self.manager.transition.bind(on_complete=self.restart_limpa)
-		erro = 0
+		erros = 0
 		pontos = 0
 		qtdimagens = 0
 		inicio = 0
@@ -365,7 +447,7 @@ class ImageButton(ButtonBehavior, AsyncImage):
 	#lendo o json com os nomes dos anime/plantas
 	conteudo = open('arquivo.json').read()
 	arquivos = json.loads(conteudo)
-	erro = 0
+	erros = 0
 	def __init__(self,text='',**kwargs):
 		super(ImageButton,self).__init__(**kwargs)
 		global flag
@@ -373,105 +455,77 @@ class ImageButton(ButtonBehavior, AsyncImage):
 		self.id = str(flag)
 		self.text = text
 		flag+=1
-	def on_press(self):
-		pass
-		# retirar quando for compilar, vibracao android
-		# print(self)
-		# PythonActivity = autoclass('org.renpy.android.PythonActivity')
-		# Context = autoclass('android.content.Context')
-		# activity = PythonActivity.mActivity
-		# vibrator = activity.getSystemService(Context.VIBRATOR_SERVICE)
-		# if vibrator.hasVibrator():
-		# 	vibrator.vibrate(200)
-		# else:
-		# 	print("Your device does not have a vibration motor.")
-
-	def on_release(self):
-		pass
 	def guardabanco_t(self):#da pra usar o on_dismiss
-		global nome,tempo,pontos,erro
+		global nome, pontos, tempo, erros
 
 		
 		
 		
 		if(nome == ''):
 			print("Nenhum nome salvo")
+			banco = sqlite3.connect('teste.db')#deletando a marca do BD 
+			c = banco.cursor()
+			c.execute("DELETE FROM rank WHERE nome like '&&&marca&&&';")
+			banco.commit()
 
 		else:
-			print("Salvo no banco de dados teste = "+str(nome)+' '+str(tempo))
+			print("Salvo no banco de dados teste = "+(nome)+' '+str(tempo))
 			
 			banco = sqlite3.connect('teste.db')
 			c = banco.cursor()
-			c.execute('''CREATE TABLE IF NOT EXISTS rank (nome text,pontos integer,tempo real,erros integer)''')
-			parametros = []
-			parametros = (nome,pontos,tempo,erro)
-			c.execute("INSERT INTO rank VALUES (?,?,?,?)",parametros)
+			c.execute("UPDATE rank SET nome = ?  WHERE nome = '&&&marca&&&';",[nome])
 			banco.commit()
+		
 			nome = ''
 			tempo = 0
 			ponto = 0
+			erros = 0
 			
-	def pop(self):
-		global inicio,fim,tempo,erro,pontos
-		
-		tempo = ('{:.2f}'.format(fim - inicio))
-		
-		
+	def pop(self,*args):
+		global inicio,fim,tempo,erros,pontos,Memo_fechar
+
+		tempo = ('{:0.2f}'.format(fim - inicio))
+		print(tempo)
+
 		banco = sqlite3.connect('teste.db')
 		c = banco.cursor()
 		c.execute('''CREATE TABLE IF NOT EXISTS rank (nome text,pontos integer,tempo real,erros integer)''')
-		dump = c.execute("SELECT count(tempo)from rank where tempo < ?",[tempo])##conta os de cima
-		
-		j = dump.fetchall()
-		
-		dump = []
-		dump = c.execute("SELECT * FROM(SELECT * FROM(SELECT tempo,nome,pontos,erros FROM rank WHERE tempo < ?)  as A ORDER BY tempo DESC limit 3) as B ORDER BY tempo ASC",[tempo])
-		teste = dump.fetchall()
-		
 
-		teste.append((tempo,'%&marca&%',pontos,erro))
-		i = 0
-		qtd_bank = j[0][0]
-		indice = []
+		c.execute("INSERT into rank (nome,pontos,tempo, erros) values (?,?,?,?);",['&&&marca&&&',pontos,tempo,erros])
 		
-		if(qtd_bank > 0):
-			if(qtd_bank >= 3):
-				inic = qtd_bank-2
-			else:
-				if(qtd_bank == 2):
-					inic = qtd_bank -1
-				else:
-					inic = qtd_bank
-			qtd_bank+=1 
-			for i in range(inic,qtd_bank,1):
-				indice.append(i)
-			#adc o do jogador
-		else:
-			
-			indice.append(0)
-			#adc o do jogador
-		
-		dump = c.execute("SELECT count(tempo)from rank where tempo > ?",[tempo])#conta os de baixo
-		j = dump.fetchall()
-		
-		qtd_bank = j[0][0]
-		i+=1
-		indice.append(i)
-		
-		qtd_bank += (i+1)
+		c.execute("CREATE TEMP TABLE tmp_rank AS SELECT nome,pontos,tempo, erros FROM rank ORDER BY pontos desc, tempo asc, erros asc")
 
-		for k in range(i+1,qtd_bank,1):
-			indice.append(k)	
 
-		dump = c.execute("SELECT * FROM(SELECT * FROM(SELECT tempo,nome,pontos,erros FROM rank WHERE tempo > ?) as A ORDER BY tempo asc limit 3)",[tempo])
+		dump = c.execute("SELECT rowid,nome,pontos,tempo,erros from tmp_rank order by pontos desc, tempo asc, erros asc")
+
+		#print("3 de cima----------------")
 		
-		qb = dump.fetchall()
-		for i in qb:
-			teste.append(i)
+		posicao = c.execute("select rowid from tmp_rank where nome like '&&&marca&&&'")
+		posicao = posicao.fetchall()
+		posicao = posicao[0][0]
+		
+		dump = c.execute("SELECT rowid, nome, pontos,tempo, erros from (SELECT rowid, nome, pontos,tempo,erros from (SELECT rowid, nome, pontos,tempo, erros FROM tmp_rank where rowid < ? ORDER by pontos desc, tempo asc, erros asc) as A order by  pontos asc, tempo desc, erros desc limit 3) as AB order by rowid asc;",[posicao])
+		
+		Vdump = []
+		for a in dump.fetchall():
+			Vdump.append(a)
 
-		cont = indice[0]
+		#print("Posicao no BD----------------")
+		dump = c.execute("SELECT rowid AS posicao, nome, pontos,tempo, erros FROM tmp_rank where posicao =  ? ORDER by pontos desc, tempo asc, erros asc;",[posicao])
+		
+		a = dump.fetchall()
+		a = a[0]
+		Vdump.append(a)
 
-		pop = Popcustom(title='Fim de jogo',title_size='30sp',title_align='center',size_hint=(.1,.1),auto_dismiss=False,background = 'imagens/fundo.png', background_color=(0,0,0,.9),separator_color=(0,0,0,0))
+
+		#print("3 de baixo----------------")
+
+		dump = c.execute("SELECT posicao, nome, pontos,tempo, erros from(SELECT rowid AS posicao, nome, pontos,tempo, erros FROM tmp_rank where posicao >  ? ORDER by pontos desc, tempo asc, erros asc limit 3)  as AB order by posicao asc;",[posicao])
+		
+		for a in dump.fetchall():
+			Vdump.append(a)
+		
+		pop = Popcustom(title='Fim de jogo',title_size='30sp',title_align='center',size_hint=(1,1),auto_dismiss=False,background = 'imagens/fundo.png', background_color=(0,0,0,.9),separator_color=(0,0,0,0))
 		
 		box = BoxLayoutCustom2()
 		box.cor = 0.10,0.05,0,.9
@@ -481,9 +535,10 @@ class ImageButton(ButtonBehavior, AsyncImage):
 		box.add_widget(Tarefa_two(text='Tempo'))
 		box.add_widget(Tarefa_two(text='Erros'))
 		pop.ids.box.add_widget(box)
-		for tupla in teste:
-			#print(str(cont)+' '+str(tupla[0])+' '+tupla[1]+' '+tupla[2])
-			
+		cont = 0
+		#print("TUPLA=-=-=-=-=-=-=-=-")
+		for tupla in Vdump:
+
 			if (cont % 2 == 0):
 				cor = [0.30,0.14,0,.6]
 			else:
@@ -491,29 +546,36 @@ class ImageButton(ButtonBehavior, AsyncImage):
 
 			box = BoxLayoutCustom2()
 			box.cor = cor
-			if(tupla[1] == '%&marca&%'):
-				box.add_widget(Tarefa_two(text=str(cont)))
+			if(tupla[1] == '&&&marca&&&'):
+				box.add_widget(Tarefa_two(text=str(tupla[0])))#posica
 				box.add_widget(InserenomeMemory())#nome
-				box.add_widget(Tarefa_two(text=str(pontos)))
-				box.add_widget(Tarefa_two(text=str(tempo)+'s'))#tempo(real)
-				box.add_widget(Tarefa_two(text=str(erro)))
+				box.add_widget(Tarefa_two(text=str(pontos)))#pontos
+				box.add_widget(Tarefa_two(text=str(tempo)+'s'))#tempo
+				box.add_widget(Tarefa_two(text=str(erros)))
+				save = box
 			else:
-				box.add_widget(Tarefa_two(text=str(cont)))
-				box.add_widget(Tarefa_two(text=str(tupla[1])))#nome
+				box.add_widget(Tarefa_two(text=str(tupla[0])))
+				box.add_widget(Tarefa_two(text=tupla[1]))#nome
 				box.add_widget(Tarefa_two(text=str(tupla[2])))
-				box.add_widget(Tarefa_two(text=str(tupla[0])+'s'))#tempo(real)
-				box.add_widget(Tarefa_two(text=str(tupla[3])))
-		
+				box.add_widget(Tarefa_two(text=str(tupla[3])+'s'))#tempo(real)
+				box.add_widget(Tarefa_two(text=str(tupla[4])))
 			pop.ids.box.add_widget(box)
 			cont+=1
 
+		pop.ids.scroll.scroll_to(save)
+		print(pop.ids.scroll)
 		b2 = BoxLayoutCustom2(orientation='vertical',cor=(1,1,1,0))
-		b2.add_widget(Botao_custom(text='Fechar Popup',on_press = ImageButton.guardabanco_t ,on_release=pop.dismiss))
+		Memo_fechar = Botao_custom(text='Fechar Popup',on_press = ImageButton.guardabanco_t ,on_release=pop.dismiss) 
+		b2.add_widget(Memo_fechar)
 		pop.ids.box.add_widget(b2)
-		#self.ids.scroll.scroll_to(box)
-		anim = Animation(size_hint=(1,1),duration=1,t='out_back')
-		anim.start(pop)
-		Clock.schedule_once(pop.open, 1.1)
+		
+		#anim = Animation(size_hint=(1,1),duration=1,t='out_back')
+		#anim.start(pop)
+		
+		c.execute("DROP TABLE tmp_rank;")
+		banco.commit()
+		pop.open()
+		#Clock.schedule_once(pop.open, 1.2)
 	
 
 	def AcertoImg(self,text=[]):
@@ -523,7 +585,7 @@ class ImageButton(ButtonBehavior, AsyncImage):
 		figura = Image(source=str(text))		
 		box.add_widget(figura)
 		
-		pop = Popup(title=self.arquivos[text],title_font='DejaVuSans',separator_height='0dp',title_color=(1,1,1,1),title_size='30sp', content = box,size_hint=(.1,.1),title_align='center',background = 'imagens/fundo.png', background_color=(0,0,0,.8),separator_color=(0,0,0,0))#,size=(100,100))
+		pop = Popup(title=self.arquivos[text],title_font='DejaVuSans',separator_height='0dp',auto_dismiss=False,title_color=(1,1,1,1),title_size='30sp', content = box,size_hint=(.5,.5),title_align='center',background = 'imagens/fundo.png', background_color=(0,0,0,.8),separator_color=(0,0,0,0))#,size=(100,100))
 
 		anim = Animation(size_hint=(1,1),duration=0.2,t='out_back')
 		anim.start(pop)
@@ -547,7 +609,7 @@ class ImageButton(ButtonBehavior, AsyncImage):
 
 	def conta(self,text=[]):#verifica se as imagens sao iguais e altera para acerto.png, se nao ele volta para pergunta.png
 
-		global contador,texto,ident,pontos,qtdimagens,fim,erro
+		global contador,texto,ident,pontos,qtdimagens,fim,erros
 
 		
 		if(contador == 2):
@@ -560,9 +622,9 @@ class ImageButton(ButtonBehavior, AsyncImage):
 				pontos+=1;
 				if(pontos == qtdimagens):
 					fim = time.time()
-					self.pop()			
+					Clock.schedule_once(self.pop,1.2)			
 			else:
-				erro+=1
+				erros+=1
 
 				for child in self.parent.children:
 					if(child.source != 'imagens/pergunta.png' and child.source != 'acerto.jpeg' and child.text != 'acerto.jpeg'  ):
@@ -574,7 +636,10 @@ class ImageButton(ButtonBehavior, AsyncImage):
 class Tarefa_two(BoxLayout):
 	def __init__(self,text='',**kwargs):
 		super(Tarefa_two,self).__init__(**kwargs)
-		self.ids.label.text = text
+		if(text != None):	
+			self.ids.label.text = text
+		else:
+			self.ids.label.text = ''
 class Tarefa(BoxLayout):
 
 	def __init__(self,text='',**kwargs):
@@ -587,6 +652,9 @@ class BoxLayoutCustom(BoxLayout):
 class BoxLayoutCustom2(BoxLayout):
 	def __init__(self,**kwargs):
 		super(BoxLayoutCustom2,self).__init__(**kwargs)
+class Loading(BoxLayout):
+	def __init__(self,**kwargs):
+		super(Loading,self).__init__(**kwargs)
 
 class Ranking(Screen):
 
@@ -611,10 +679,10 @@ class Ranking(Screen):
 
 			box = BoxLayoutCustom()
 			box.cor = cor
-			box.add_widget(Tarefa(text=str(contador)))
-			box.add_widget(Tarefa(text=str(linha[0])))
-			box.add_widget(Tarefa(text=str(linha[1])))
-			box.add_widget(Tarefa(text=str(linha[2])))
+			box.add_widget(Tarefa(text=contador))
+			box.add_widget(Tarefa(text=linha[0]))
+			box.add_widget(Tarefa(text=linha[1]))
+			box.add_widget(Tarefa(text=linha[2]))
 			box.add_widget(Tarefa(text=str(linha[3])+'s'))
 			contador+=1
 			
@@ -644,7 +712,7 @@ class Ranking(Screen):
 
 class LabelBotao(Image):
 
-	text = StringProperty('')
+	text = StringProperty(' ')
 	
 	def __init__(self , **kwargs):
 		super(LabelBotao, self).__init__(**kwargs)
@@ -687,14 +755,15 @@ class Pergunta(BoxLayout):
 	pontos = 0
 	selec = 0
 	tempo = 0
-	
-	def __init__(self,pergunta='',args = [],**kwargs):
+	fechar = []
+
+	def __init__(self,pergunta='',args = ["","","","","","","","",""],id=0,**kwargs):
 		
 		super(Pergunta,self).__init__(**kwargs)
 		# for key,val in self.ids.items():
 		# 	print("key={0}, val={1}".format(key,val))
-		
 		self.ids.perg.text = pergunta
+		self.ref = id
 		
 		self.ids.r1.text = args[0]#reposta
 		self.ids.r10.flag = args[1]#flag certo ou errado(1 == certo, 0 == errado)
@@ -711,88 +780,82 @@ class Pergunta(BoxLayout):
 		self.ids.r4.text = args[6]
 		self.ids.r40.flag = args[7]
 		self.ids.r40.group = str(args[8])
+	def clear(self):
+		print("LIMPANDO")		
+		self.__class__.pontos = 0
+		self.__class__.selec = 0
+		self.__class__.tempo = 0
+		self.__class__.fechar = []
 	def guardabanco_t(self):#da pra usar o on_dismiss
 		global quiz_nome,quiz_inicial,quiz_final,quiz_pontos
 
-		self.tempo = ('{:.2f}'.format(quiz_final - quiz_inicial))
+		tempo = ('{:.2f}'.format(quiz_final - quiz_inicial))
 		
 		
 		if(quiz_nome == ''):
 			print("Nenhum nome salvo")
+			banco = sqlite3.connect('quiz.db')
+			c = banco.cursor()
+			c.execute("DELETE FROM rank WHERE nome like '&&&marca&&&';")
+			banco.commit()
+
 
 		else:
-			print("Salvo no banco de dados quiz = "+str(quiz_nome)+' '+str(self.tempo))
+			print("Salvo no banco de dados quiz = "+str(quiz_nome)+' '+str(tempo))
 			
 			banco = sqlite3.connect('quiz.db')
 			c = banco.cursor()
-			c.execute('''CREATE TABLE IF NOT EXISTS rank (nome text,pontos integer,tempo real)''')
-			parametros = []
-			parametros = (quiz_nome,quiz_pontos,self.tempo)
-			c.execute("INSERT INTO rank VALUES (?,?,?)",parametros)
+			c.execute("UPDATE rank SET nome = ?  WHERE nome = '&&&marca&&&';",[quiz_nome])
 			banco.commit()
+
 			quiz_nome = ''
 			self.__class__.tempo = 0
+			tempo = 0
 			quiz_pontos = 0
 			
-	def pop(self):
-		global quiz_final, quiz_inicial,quiz_pontos
-		
-		# self.tempo = ('{:.2f}'.format(quiz_inicial - quiz_final))
-		
+	def pop(self,*args):
+		global quiz_final, quiz_inicial,quiz_pontos,quiz_fechar
+
 		banco = sqlite3.connect('quiz.db')
 		c = banco.cursor()
 		c.execute('''CREATE TABLE IF NOT EXISTS rank (nome text,pontos integer,tempo real)''')
-		dump = c.execute("SELECT count(tempo)from rank where tempo < ?",[self.tempo])##conta os de cima
 		
-		j = dump.fetchall()
+		c.execute("INSERT into rank (nome,pontos,tempo) values (?,?,?);",['&&&marca&&&',quiz_pontos,self.tempo])
+	
 		
-		dump = []
-		dump = c.execute("SELECT * FROM(SELECT * FROM(SELECT tempo,nome,pontos FROM rank WHERE tempo < ?)  as A ORDER BY tempo DESC limit 3) as B ORDER BY tempo ASC",[self.tempo])
-		teste = dump.fetchall()
-		
+		c.execute("CREATE TEMP TABLE tmp_rank AS SELECT nome,pontos,tempo FROM rank ORDER BY pontos desc, tempo asc")
 
-		teste.append((self.tempo,'%&marca&%',quiz_pontos))
-		i = 0
-		qtd_bank = j[0][0]
-		indice = []
-		
-		if(qtd_bank > 0):
-			if(qtd_bank >= 3):
-				inic = qtd_bank-2
-			else:
-				if(qtd_bank == 2):
-					inic = qtd_bank -1
-				else:
-					inic = qtd_bank
-			qtd_bank+=1 
-			for i in range(inic,qtd_bank,1):
-				indice.append(i)
-			#adc o do jogador
-		else:
-			
-			indice.append(0)
-			#adc o do jogador
-		
-		dump = c.execute("SELECT count(tempo)from rank where tempo > ?",[self.tempo])#conta os de baixo
-		j = dump.fetchall()
-		
-		qtd_bank = j[0][0]
-		i+=1
-		indice.append(i)
-		
-		qtd_bank += (i+1)
-		for k in range(i+1,qtd_bank,1):
-			indice.append(k)
-		
-		
-		dump = c.execute("SELECT * FROM(SELECT * FROM(SELECT tempo,nome,pontos FROM rank WHERE tempo > ?) as A ORDER BY tempo asc limit 3)",[self.tempo])
-		
-		qb = dump.fetchall()
-		for i in qb:
-			teste.append(i)
-		cont = indice[0]
 
-		pop = Popcustom(title='Fim de jogo',title_size='30sp',title_align='center',size_hint=(.1,.1),auto_dismiss=False,background = 'imagens/fundo.png', background_color=(0,0,0,.9),separator_color=(0,0,0,0))
+		dump = c.execute("select rowid,nome,pontos,tempo from tmp_rank order by pontos desc, tempo asc")
+
+		#print("3 de cima----------------")
+		
+		posicao = c.execute("select rowid from tmp_rank where nome like '&&&marca&&&'")
+		posicao = posicao.fetchall()
+		posicao = posicao[0][0]
+		
+		dump = c.execute("SELECT rowid, nome, pontos,tempo from (SELECT rowid, nome, pontos,tempo from (SELECT rowid, nome, pontos,tempo FROM tmp_rank where rowid < ? ORDER by pontos desc, tempo asc) as A order by  pontos asc, tempo desc limit 3) as AB order by rowid asc;",[posicao])
+		
+		Vdump = []
+		for a in dump.fetchall():
+			Vdump.append(a)
+
+		#print("Posicao no BD----------------")
+		dump = c.execute("SELECT rowid AS posicao, nome, pontos,tempo FROM tmp_rank where posicao =  ? ORDER by pontos desc, tempo asc;",[posicao])
+		
+		a = dump.fetchall()
+		a = a[0]
+		Vdump.append(a)
+
+
+		#print("3 de baixo----------------")
+
+		dump = c.execute("SELECT posicao, nome, pontos,tempo from(SELECT rowid AS posicao, nome, pontos,tempo FROM tmp_rank where posicao >  ? ORDER by pontos desc, tempo asc limit 3)  as AB order by posicao asc;",[posicao])
+		
+		for a in dump.fetchall():
+			Vdump.append(a)
+		
+		pop = Popcustom(title='Fim de jogo',title_size='30sp',title_align='center',size_hint=(1,1),auto_dismiss=False,background = 'imagens/fundo.png', background_color=(0,0,0,.9),separator_color=(0,0,0,0))
 		
 		box = BoxLayoutCustom2()
 		box.cor = 0.10,0.05,0,.9
@@ -801,9 +864,10 @@ class Pergunta(BoxLayout):
 		box.add_widget(Tarefa_two(text='Pontos'))
 		box.add_widget(Tarefa_two(text='Tempo'))
 		pop.ids.box.add_widget(box)
-		for tupla in teste:
-			#print(str(cont)+' '+str(tupla[0])+' '+tupla[1]+' '+tupla[2])
-			
+		cont = 0
+		#print("TUPLA=-=-=-=-=-=-=-=-")
+		for tupla in Vdump:
+
 			if (cont % 2 == 0):
 				cor = [0.30,0.14,0,.6]
 			else:
@@ -811,32 +875,39 @@ class Pergunta(BoxLayout):
 
 			box = BoxLayoutCustom2()
 			box.cor = cor
-			if(tupla[1] == '%&marca&%'):
-				box.add_widget(Tarefa_two(text=str(cont)))
+			if(tupla[1] == '&&&marca&&&'):
+				box.add_widget(Tarefa_two(text=str(tupla[0])))#posica
 				box.add_widget(Inserenome2())#nome
-				box.add_widget(Tarefa_two(text=str(quiz_pontos)))
+				box.add_widget(Tarefa_two(text=str(quiz_pontos)))#pontos
 				box.add_widget(Tarefa_two(text=str(self.tempo)+'s'))#tempo(real)
+				save = box
 			else:
-				box.add_widget(Tarefa_two(text=str(cont)))
-				box.add_widget(Tarefa_two(text=str(tupla[1])))#nome
+				box.add_widget(Tarefa_two(text=str(tupla[0])))
+				box.add_widget(Tarefa_two(text=tupla[1]))#nome
 				box.add_widget(Tarefa_two(text=str(tupla[2])))
-				box.add_widget(Tarefa_two(text=str(tupla[0])+'s'))#tempo(real)
+				box.add_widget(Tarefa_two(text=str(tupla[3])+'s'))#tempo(real)
 		
 			pop.ids.box.add_widget(box)
 			cont+=1
 
+		pop.ids.scroll.scroll_to(save)
 		b2 = BoxLayoutCustom2(orientation='vertical',cor=(1,1,1,0))
-		b2.add_widget(Botao_custom(text='Fechar Popup',on_press = Pergunta.guardabanco_t ,on_release=pop.dismiss))
+		quiz_fechar = Botao_custom(text='Fechar Popup',on_press = Pergunta.guardabanco_t ,on_release=pop.dismiss) 
+		b2.add_widget(quiz_fechar)
 		pop.ids.box.add_widget(b2)
-		#self.ids.scroll.scroll_to(box)
-		anim = Animation(size_hint=(1,1),duration=1,t='out_back')
-		anim.start(pop)
+		
+		#anim = Animation(size_hint=(1,1),duration=1,t='out_back')
+		#anim.start(pop)
+		
+		c.execute("DROP TABLE tmp_rank;")
+		banco.commit()
+		
 		Clock.schedule_once(pop.open, 0.5)
 
-		
 	def verifica(self,flag):
 		global quiz_final,quiz_inicial,quiz_pontos
 		
+		Clock.schedule_once(lambda dt:Quiz().mov(id =self.ref,arg = self),0.4)
 		
 		self.__class__.selec+=1
 		if(flag):
@@ -844,7 +915,7 @@ class Pergunta(BoxLayout):
 			quiz_pontos+=1
 			
 		else:
-			print("Errou")
+			print("errou")
 		for child in self.children:
 			
 			flag = 0
@@ -862,30 +933,48 @@ class Pergunta(BoxLayout):
 			quiz_final = time.time() 
 			self.__class__.tempo = ('{:.2f}'.format(quiz_final - quiz_inicial))
 			self.__class__.selec=0
-			self.pop()
-
-
+			# a = Thread(target = self.pop, args = [])
+			# a.start()
+			Clock.schedule_once(lambda dt:self.pop(),0.1)
 		
 class InserenomeMemory(BoxLayout):
-	nome = ''
+	
 	def __init__(self,**kwargs):
 		super(InserenomeMemory,self).__init__(**kwargs)
 	def salvanome(self):
 		global nome
-		self.nome = self.ids.texinp.text
-		nome = self.nome
-		self.ids.box1.add_widget(Tarefa_two(text=self.nome))
-		
+		if (len(self.ids.texinp.text) != 0):
+			self.nome = self.ids.texinp.text
+			nome = self.nome
+			self.ids.box1.add_widget(Tarefa_two(text=self.nome))
+		else:
+			self.ids.box1.add_widget(Tarefa_two(text=':/'))
+	def redmensiona(self):#teclado abaixo do textinput
+		Window.softinput_mode = 'below_target'
+	def finishScroll(self,scroll):
+		global Memo_fechar
+		Clock.schedule_once(lambda dt: scroll.scroll_to(Memo_fechar),0.5)#move o scrollview ate o botao fechar
+
 class Inserenome2(BoxLayout):
 	nome = ''
 	def __init__(self,**kwargs):
 		super(Inserenome2,self).__init__(**kwargs)
 	def salvanome(self):
 		global quiz_nome
-		
-		self.nome = self.ids.texinp.text
-		quiz_nome = self.nome
-		self.ids.box1.add_widget(Tarefa_two(text=self.nome))
+		if (len(self.ids.texinp.text) != 0):
+
+			self.nome = self.ids.texinp.text
+			quiz_nome = self.nome
+			self.ids.box1.add_widget(Tarefa_two(text=self.nome))
+		else:
+			self.ids.box1.add_widget(Tarefa_two(text=':/'))
+
+	def redmensiona(self):#teclado abaixo do textinput
+		Window.softinput_mode = 'below_target'
+	def finishScroll(self,scroll):
+		global quiz_fechar
+
+		Clock.schedule_once(lambda dt: scroll.scroll_to(quiz_fechar),0.5)#move o scrollview ate o botao fechar
 class Popcustom(Popup):
 	def __init__(self,**kwargs):
 		super(Popcustom,self).__init__(**kwargs)
@@ -894,10 +983,12 @@ class Botao_custom(ButtonBehavior,LabelBotao):
 	def __init__(self,**kwargs):
 		super(Botao_custom,self).__init__(**kwargs)
 class Novo(App):
-	title = 'Muhna'
+	#title = 'Muhna'
 		
 	def build(self):
-		print(LoggerHistory.history)
+		self.title = 'Muhna'
+		self.icon = 'imagens/pergunta.png'
+
 		return Gerenciador()
 	
 	def on_pause(self):
@@ -914,4 +1005,17 @@ class Novo(App):
 		Normalmente voce nao precisara fazer nada.
 		'''
 		pass
+	def on_stop(self):
+
+		print("Saindo na forca")
+		#deletando uma marcacao dos dois BD
+		banco = sqlite3.connect('quiz.db')
+		c = banco.cursor()
+		c.execute("DELETE FROM rank WHERE nome like '&&&marca&&&';")
+		banco.commit()
+
+		banco = sqlite3.connect('teste.db')
+		c = banco.cursor()
+		c.execute("DELETE FROM rank WHERE nome like '&&&marca&&&';")
+		banco.commit()
 Novo().run()
