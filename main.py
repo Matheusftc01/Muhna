@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: UTF-8 -*-
 
-'''	
+'''
 	* Kivy version 1.10.1
 	* Matheus Felipe Teodoro Correia
 	* matheuscorreia559@gmail.com
@@ -9,40 +9,29 @@
 	* Aplicativo Muhna
 	----implementado
 	* Jogo da memoria
-	* banco de dados com placar 
+	* banco de dados com placar
 	* Quiz
 '''
 from kivy.app import App
-from kivy.uix.button import Button
 from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.scrollview import ScrollView
 from kivy.uix.label import Label
-from kivy.uix.screenmanager import ScreenManager,Screen
+from kivy.uix.screenmanager import ScreenManager, Screen
 from kivy.uix.gridlayout import GridLayout
-from kivy.uix.behaviors import ButtonBehavior 
-from kivy.uix.image import Image,AsyncImage
-from kivy.properties import StringProperty,NumericProperty, ListProperty
-from kivy.properties import ObjectProperty
+from kivy.uix.behaviors import ButtonBehavior
+from kivy.uix.image import Image, AsyncImage
+from kivy.properties import StringProperty, ListProperty
 from kivy.clock import Clock
-from kivy.loader import Loader
 from kivy.uix.popup import Popup
-from random import randint
 from kivy.animation import Animation
-from kivy.graphics import Color, Rectangle, Ellipse
-from kivy.uix.floatlayout import FloatLayout
-from kivy.uix.textinput import TextInput
-from kivy.logger import LoggerHistory
-from functools import partial
 from threading import Thread
 from kivy.core.window import Window
 import sqlite3
-import os
 import time
 import random
 import json
-import os
 
-#Variaveis globais
+
+# Variaveis globais
 tempo = 0
 qtdimagens = 0
 contador = 0
@@ -53,44 +42,39 @@ fim = 0
 flag = 0
 erros = 0
 nome = ''
-ident = []
-Memo_fechar = []
 
 
-#globais do quiz
-quiz_inicial = 0
-quiz_final = 0
-quiz_nome = ''
-quiz_pontos = 0
-quiz_fechar = []
-five_caixas = []
-visit = []
-''' 
-	*lembrar
-	*	nao se esquecer que compila em python 2 (VM-buildozer)
-	*	setxkbmap br = teclado em pt-br kivy (VM-buildozer)
-	*	acerto.jpeg eh usado apenas como marcacao de acerto, nao eh uma imagem
+
+'''
+	*	lembrar:
+	*   	nao se esquecer que compila em python 2 (VM-buildozer)
+	*   	setxkbmap br = teclado em pt-br kivy (VM-buildozer)
+	*   	acerto.jpeg eh usado apenas como marcacao de acerto, nao eh uma imagem
 	*
 '''
 
 Clock.max_iteration = 30
 
-class Gerenciador(ScreenManager):#gerenciador de telas
-	def __init__(self,**kwargs):
-		super(Gerenciador,self).__init__(**kwargs)
+
+class Gerenciador(ScreenManager):  # gerenciador de telas
+	def __init__(self, **kwargs):
+		super(Gerenciador, self).__init__(**kwargs)
+
 
 class Inserenome(BoxLayout):
 
-	def __init__(self,**kwargs):
-		super(Inserenome,self).__init__(**kwargs)
+	def __init__(self, **kwargs):
+		super(Inserenome, self).__init__(**kwargs)
+
 	def salvanome(self):
 		global nome
 		nome = self.ids.texinp.text
-		self.ids.texinp.text=""
+		self.ids.texinp.text = ""
 		print(nome)
-	def guardabanco(self):#da pra usar o on_dismiss
-		global nome,pontos,tempo,erros
-		
+
+	def guardabanco(self):  # da pra usar o on_dismiss
+		global nome, pontos, tempo, erros
+
 		if(nome == ''):
 			print("Nenhum nome salvo")
 
@@ -99,57 +83,40 @@ class Inserenome(BoxLayout):
 			banco = sqlite3.connect('teste.db')
 			c = banco.cursor()
 			c.execute('''CREATE TABLE IF NOT EXISTS rank (nome text, pontos integer, tempo real, erros integer)''')
-			parametros = (nome,pontos,tempo,erros)
-			c.execute("INSERT INTO rank VALUES (?,?,?,?)",parametros)
+			parametros = (nome, pontos, tempo, erros)
+			c.execute("INSERT INTO rank VALUES (?,?,?,?)", parametros)
 			banco.commit()
 			nome = ''
 
+
 class Menu(Screen):
-	def __init__(self,**kwargs):
-		super(Menu,self).__init__(**kwargs)
-	def on_enter(self):
-		
-		a = Thread(target = Quiz().dp_enter(),args = [])
-		a.start()
+	def __init__(self, **kwargs):
+		super(Menu, self).__init__(**kwargs)
+
 
 class Quiz(Screen):
-	temp = []
-	rank_inic = []
+	quiz_pontos = 0
+	five_caixas = []
+	visit = []
 	def __init__(self,**kwargs):
 		super(Quiz,self).__init__(**kwargs)
 		
 	# def on_pre_enter(self):
-	# 	Clock.schedule_once(lambda dt: self.pra_enter(self),0.3)
-	# def on_pre_enter(self):
-	# 	a = Thread(target = self.dp_enter,args = [self])
-	# 	a.start()
-	def on_enter(self, *args):			
-		self.constroi_3rank()
-		b = Thread(target = self.carregaWidgetsF, args = [self])
-		b.start()
-		box = BoxLayoutCustom2()
-		box.cor = 0.10,0.05,0,0
-		box.add_widget(LabelBotao(text='Os 3 melhores no quiz',color=(0,0,0,1)))
-		#MyLabel(text='Os 3 melhores',size_hint_y=None,height='60dp')
-		self.ids.qg.add_widget(box)
-	def constroi_3rank(self):
-		for widget in self.rank_inic:
-			self.ids.qf.add_widget(widget)
+	#   Clock.schedule_once(lambda dt: self.pra_enter(self),0.3)
+	
 	def mov(self,id = 0,arg='',*args):
-		global five_caixas,visit
-		# print(visit)
-		# print("mov")
-		# print(id)
+	
 		scroll_quiz = arg.parent.parent
-		visit[id] = 1
+		self.__class__.visit[id] = 1
 		for j in range(5):
-			if(visit[j] != 1):
-				scroll_quiz.scroll_to(five_caixas[j])
+			if(self.__class__.visit[j] != 1):
+				scroll_quiz.scroll_to(self.__class__.five_caixas[j])
 				break
-			
-	def dp_enter(self, *args):#terminada a animacao de entrada na tela
 
-		self.__class__.rank_inic = []
+	def on_enter(self, *args):#terminada a animacao de entrada na tela
+		
+
+
 		banco = sqlite3.connect('quiz.db')
 		c = banco.cursor()
 		c.execute('''CREATE TABLE IF NOT EXISTS rank (nome text,pontos integer,tempo real)''')
@@ -157,7 +124,11 @@ class Quiz(Screen):
 		
 		j = dump.fetchall()
 		
-		
+		box = BoxLayoutCustom2()
+		box.cor = 0.10,0.05,0,0
+		box.add_widget(LabelBotao(text='Os 3 melhores no quiz',color=(0,0,0,1)))
+		#MyLabel(text='Os 3 melhores',size_hint_y=None,height='60dp')
+		self.ids.qg.add_widget(box)
 		
 		box = BoxLayoutCustom2()
 		box.cor = 0.10,0.05,0,.9
@@ -167,8 +138,8 @@ class Quiz(Screen):
 		box.add_widget(Tarefa_two(text='Tempo'))
 		
 	
-		self.__class__.rank_inic.append(box)
-		#self.ids.qf.add_widget(box)
+		
+		self.ids.qf.add_widget(box)
 		ind = 1
 		cor = 0.10,0.05,0,.8
 		#print(j)
@@ -188,8 +159,7 @@ class Quiz(Screen):
 				box.add_widget(Tarefa_two(text=dumps[0]))#nome
 				box.add_widget(Tarefa_two(text=str(dumps[1])))#pontos
 				box.add_widget(Tarefa_two(text=str(dumps[2])+'s'))#tempo
-				self.__class__.rank_inic.append(box)
-				#self.ids.qf.add_widget(box)
+				self.ids.qf.add_widget(box)
 				ind+=1
 		else:
 			box = BoxLayoutCustom2()
@@ -198,20 +168,18 @@ class Quiz(Screen):
 			box.add_widget(Tarefa_two(text=str("Muhna")))
 			box.add_widget(Tarefa_two(text=str("2019")))
 			box.add_widget(Tarefa_two(text=str(0.1)+'s'))
-			self.__class__.rank_inic.append(box)
-			#self.ids.qf.add_widget(box)
+			self.ids.qf.add_widget(box)
 			
 
 	def previous_screen_limpa(self, *args):
 	
-		global quiz_pontos
 		self.manager.transition.direction = 'right'
 		self.manager.current = 'menu'
 		self.manager.transition.bind(on_complete=self.restart_limpa)
 		
 		# for key,val in self.ids.items():
-		#  	print("key={0}, val={1}".format(key,val))
-		quiz_pontos = 0
+		#   print("key={0}, val={1}".format(key,val))
+		self.__class__.quiz_pontos = 0
 
 	def restart_limpa(self,  *args):
 		global contador,texto
@@ -221,7 +189,7 @@ class Quiz(Screen):
 		self.limpatela()
 
 
-	def limpatela(self,*args):#botao recomecar, limpa a tela e cria uma nova tela		
+	def limpatela(self,*args):#botao recomecar, limpa a tela e cria uma nova tela       
 		self.parent.remove_widget(self)
 		quiz = Quiz(name='quiz')
 		self.parent.add_widget(quiz)
@@ -232,22 +200,21 @@ class Quiz(Screen):
 		box = Loading()
 		self.ids.qz.add_widget(box)
 		Clock.schedule_once(lambda dt: self.carregaWidgetsF(self),0.3)#talvez 0.1
-		a = Thread(target = self.carregaWidgetsF,args = [self])
-		Clock.schedule_once(lambda dt: a.start(),0.1)
+		# a = Thread(target = self.carregaWidgetsF,args = [self])
+		# Clock.schedule_once(lambda dt: a.start(),0.1)
 		print("Iniciou")
 	def carregaWidgetsF(self,*args):
-		global quiz_inicial, five_caixas,visit
-		self.temp = []
-		visit = [0]*5
 
-		five_caixas = []
+		self.__class__.visit = [0]*5
+
+		self.__class__.five_caixas = []
 		
 		conteudo = open('quiz.json').read()
 		arquivos = json.loads(conteudo)
 		#print(arquivos[19])
 		cont = 0
-		#self.ids.qz.clear_widgets()
-		for j in range(5):	
+		self.ids.qz.clear_widgets()
+		for j in range(5):  
 			selecionado = random.choice(arquivos)
 			#print(selecionado)
 			
@@ -256,7 +223,7 @@ class Quiz(Screen):
 			
 			salvar = []
 			
-			for respostas in selecionado[u'Respostas']:			
+			for respostas in selecionado[u'Respostas']:         
 				salvar.append(respostas)
 		
 			random.shuffle(salvar)
@@ -274,27 +241,37 @@ class Quiz(Screen):
 			#print(adc)
 			adc.append(j)
 
+			temp = Pergunta(pergunta=pergunta,args=adc,id=cont)
 
-			new_perg = Pergunta(pergunta=pergunta,args=adc,id=cont)#quadro com pergunta e possiveis respostas
-			self.temp.append(new_perg)
-
-			five_caixas.append(new_perg)
-			# self.ids.qz.add_widget(temp)
+			self.__class__.five_caixas.append(temp)
+			self.ids.qz.add_widget(temp)
 
 			cont+=1
 			
 			#Clock.schedule_once(self.printa,0.1)#mostra os id dos widgets
-		# quiz_inicial = time.time()
+		self.__class__.quiz_inicial = time.time()
+
 	def constroi(self):#coloca os widget de pergunta na tela do quiz
-		global quiz_inicial
-		
 		for widget in self.temp:
 			self.ids.qz.add_widget(widget)
-		quiz_inicial = time.time()
+		self.__class__.quiz_inicial = time.time()
 
 	def desconstroi(self,*args):#remove todos os widgets da tela do quiz
 		self.ids.qz.clear_widgets()
-		
+	
+	#set e getters
+	def setQuiz_inicial(self,valor):
+		self.__class__.quiz_inicial = valor
+	
+	def getQuiz_inicial(self):
+		return self.__class__.quiz_inicial
+
+	def setQuiz_pontos(self, valor = 0):
+		self.__class__.quiz_pontos = valor
+
+	def getQuiz_pontos(self):
+		return self.__class__.quiz_pontos
+
 
 class MyLabel(Image):#redimensiona os textos
 	text = StringProperty('')
@@ -308,9 +285,12 @@ class MyLabel(Image):#redimensiona os textos
 		# Set it to image, it'll be scaled to image size automatically:
 		self.texture = l.texture
 
+
 class GridLayout_custom(GridLayout):
 	def __init__(self,**kwargs):
 		super(GridLayout_custom,self).__init__(**kwargs)
+
+
 class Jogo(Screen):#Tela do jogo da memoria
 	
 	def __init__(self,**kwargs):
@@ -324,13 +304,13 @@ class Jogo(Screen):#Tela do jogo da memoria
 		dump = c.execute("SELECT nome,pontos,tempo,erros from rank order by pontos desc , erros asc ,tempo asc limit 3")##conta os de cima
 		j = dump.fetchall()
 
-		
+
 		box = BoxLayoutCustom2()
 		box.cor = 0.10,0.05,0,0
 		box.add_widget(LabelBotao(text='Os 3 melhores no jogo da memória',color=(0,0,0,1)))
 		#MyLabel(text='Os 3 melhores',size_hint_y=None,height='60dp')
 		self.ids.label.add_widget(box)
-		
+
 		box = BoxLayoutCustom2()
 		box.cor = 0.10,0.05,0,.9
 		box.add_widget(Tarefa_two(text='N°'))
@@ -338,9 +318,7 @@ class Jogo(Screen):#Tela do jogo da memoria
 		box.add_widget(Tarefa_two(text='Pontos'))
 		box.add_widget(Tarefa_two(text='Tempo'))
 		box.add_widget(Tarefa_two(text='erros'))
-		
-	
-		
+
 		self.ids.tbox2.add_widget(box)
 		ind = 1
 		cor = 0.10,0.05,0,.8
@@ -375,7 +353,7 @@ class Jogo(Screen):#Tela do jogo da memoria
 				tmp += 1
 				pnt -= 1
 
-	def addImagem(self,valor):#adc os widgets com o text contendo os nomes das imagens		
+	def addImagem(self,valor):#adc os widgets com o text contendo os nomes das imagens      
 		global inicio
 		global qtdimagens
 		
@@ -437,7 +415,7 @@ class Jogo(Screen):#Tela do jogo da memoria
 		contador = 0
 		texto = []
 
-	def limpatela(self,*args):#botao recomecar, limpa a tela e cria uma nova tela		
+	def limpatela(self,*args):#botao recomecar, limpa a tela e cria uma nova tela       
 		self.parent.remove_widget(self)
 		jogo = Jogo(name='jogo')
 		self.parent.add_widget(jogo)
@@ -448,10 +426,13 @@ class ImageButton(ButtonBehavior, AsyncImage):
 	conteudo = open('arquivo.json').read()
 	arquivos = json.loads(conteudo)
 	erros = 0
+	ident = []
+	Memo_fechar = []
+
 	def __init__(self,text='',**kwargs):
 		super(ImageButton,self).__init__(**kwargs)
 		global flag
-		global fim
+
 		self.id = str(flag)
 		self.text = text
 		flag+=1
@@ -482,7 +463,7 @@ class ImageButton(ButtonBehavior, AsyncImage):
 			erros = 0
 			
 	def pop(self,*args):
-		global inicio,fim,tempo,erros,pontos,Memo_fechar
+		global inicio,fim,tempo,erros,pontos
 
 		tempo = ('{:0.2f}'.format(fim - inicio))
 		print(tempo)
@@ -563,10 +544,11 @@ class ImageButton(ButtonBehavior, AsyncImage):
 			cont+=1
 
 		pop.ids.scroll.scroll_to(save)
-		print(pop.ids.scroll)
+		# print(pop.ids.scroll)
 		b2 = BoxLayoutCustom2(orientation='vertical',cor=(1,1,1,0))
-		Memo_fechar = Botao_custom(text='Fechar Popup',on_press = ImageButton.guardabanco_t ,on_release=pop.dismiss) 
-		b2.add_widget(Memo_fechar)
+		self.__class__.Memo_fechar = Botao_custom(text='Fechar',on_press = ImageButton.guardabanco_t ,on_release=pop.dismiss) 
+		self.__class__.Memo_fechar.rgba = [0,0.20,0,1]
+		b2.add_widget(self.__class__.Memo_fechar)
 		pop.ids.box.add_widget(b2)
 		
 		#anim = Animation(size_hint=(1,1),duration=1,t='out_back')
@@ -582,10 +564,10 @@ class ImageButton(ButtonBehavior, AsyncImage):
 
 		box = BoxLayout(orientation = 'vertical')#,padding=10,spacing=10)
 
-		figura = Image(source=str(text))		
+		figura = Image(source=str(text))        
 		box.add_widget(figura)
 		
-		pop = Popup(title=self.arquivos[text],title_font='DejaVuSans',separator_height='0dp',auto_dismiss=False,title_color=(1,1,1,1),title_size='30sp', content = box,size_hint=(.5,.5),title_align='center',background = 'imagens/fundo.png', background_color=(0,0,0,.8),separator_color=(0,0,0,0))#,size=(100,100))
+		pop = Popup(title=self.arquivos[text],title_font='DejaVuSans',separator_height='0dp',auto_dismiss=False,title_color=(1,1,1,1),title_size='30sp', content = box,size_hint=(.7,.7),title_align='center',background = 'imagens/fundo.png', background_color=(0,0,0,.8),separator_color=(0,0,0,0))#,size=(100,100))
 
 		anim = Animation(size_hint=(1,1),duration=0.2,t='out_back')
 		anim.start(pop)
@@ -595,48 +577,58 @@ class ImageButton(ButtonBehavior, AsyncImage):
 		Clock.schedule_once(pop.dismiss, 1)
 
 	def troca(self,text=[]):#troca as imagens do botao
-		global contador,texto,ident
+		global contador,texto
 
 		if(contador<2 and text != 'acerto.jpeg'):
 			contador+=1
 			texto.append(str(text))
-			ident.append(self.id)
+			self.__class__.ident.append(self.id)
 			if(self.source and self.text != 'acerto.jpeg'):
 				self.source = self.text
 				self.canvas.ask_update()
 
-		Clock.schedule_once(self.conta, 1)#chama a funcao 1s a frente
+		Clock.schedule_once(self.conta, 0.5)#chama a funcao 0.5s a frente que verifica se a imagem eh certa
+		#self.conta()
 
 	def conta(self,text=[]):#verifica se as imagens sao iguais e altera para acerto.png, se nao ele volta para pergunta.png
 
-		global contador,texto,ident,pontos,qtdimagens,fim,erros
+		global contador,texto,pontos,qtdimagens,fim,erros
 
 		
 		if(contador == 2):
-			if( (texto[0] == texto[1]) and (ident[0] != ident[1]) ):
+			if( (texto[0] == texto[1]) and (self.__class__.ident[0] != self.__class__.ident[1]) ):
 				self.AcertoImg(texto[0])
 				for child in self.parent.children:
-					if(child.text == texto[0] and child.text != 'acerto.jpeg' ):			
+					if(child.text == texto[0] and child.text != 'acerto.jpeg' ):            
 						child.source = child.text
 						child.text = 'acerto.jpeg'
 				pontos+=1;
 				if(pontos == qtdimagens):
 					fim = time.time()
-					Clock.schedule_once(self.pop,1.2)			
+					print("FINAL JG Memoria")
+					Clock.schedule_once(self.pop,1.2)           
 			else:
 				erros+=1
 
 				for child in self.parent.children:
 					if(child.source != 'imagens/pergunta.png' and child.source != 'acerto.jpeg' and child.text != 'acerto.jpeg'  ):
-						child.source = 'imagens/pergunta.png'						
+						child.source = 'imagens/pergunta.png'                       
 			
 			contador=0
 			texto=[]
-			ident=[]
+			self.__class__.ident=[]
+	
+	def setMemo_fechar(self,valor):
+		self.__class__.Memo_fechar = valor
+
+	def getMemo_fechar(self, *args):
+		return self.__class__.Memo_fechar
+
+
 class Tarefa_two(BoxLayout):
 	def __init__(self,text='',**kwargs):
 		super(Tarefa_two,self).__init__(**kwargs)
-		if(text != None):	
+		if(text != None):   
 			self.ids.label.text = text
 		else:
 			self.ids.label.text = ''
@@ -644,26 +636,37 @@ class Tarefa(BoxLayout):
 
 	def __init__(self,text='',**kwargs):
 		super(Tarefa,self).__init__(**kwargs)
-		self.ids.label.text = text
+		if(text != None):   
+			self.ids.label.text = text
+		else:
+			self.ids.label.text = '-'
+
 
 class BoxLayoutCustom(BoxLayout):
 	def __init__(self,**kwargs):
 		super(BoxLayoutCustom,self).__init__(**kwargs)
+
+
 class BoxLayoutCustom2(BoxLayout):
 	def __init__(self,**kwargs):
 		super(BoxLayoutCustom2,self).__init__(**kwargs)
+
+
 class Loading(BoxLayout):
 	def __init__(self,**kwargs):
 		super(Loading,self).__init__(**kwargs)
 
+
 class Ranking(Screen):
 
-	def __init__(self,tarefas=[],**kwargs):
-		super(Ranking,self).__init__(**kwargs)
+	def __init__(self, tarefas=[], **kwargs):
+		super(Ranking, self).__init__(**kwargs)
+
 	def addWidget(self):
 		texto = self.ids.texto.text
 		self.ids.box.add_widget(Tarefa(text=texto))
 		self.ids.texto.text = ''
+
 	def teste(self):
 		banco = sqlite3.connect('teste.db')
 		c = banco.cursor()
@@ -671,21 +674,21 @@ class Ranking(Screen):
 
 		contador = 1
 		for linha in dump.fetchall():
-			
+
 			if (contador % 2 == 0):
-				cor = [0,0,0, .4]
+				cor = [0, 0, 0, .4]
 			else:
-				cor = [0,0,0,.2]
+				cor = [0, 0, 0, .2]
 
 			box = BoxLayoutCustom()
 			box.cor = cor
-			box.add_widget(Tarefa(text=contador))
+			box.add_widget(Tarefa(text=str(contador)))
 			box.add_widget(Tarefa(text=linha[0]))
-			box.add_widget(Tarefa(text=linha[1]))
-			box.add_widget(Tarefa(text=linha[2]))
+			box.add_widget(Tarefa(text=str(linha[1])))
+			box.add_widget(Tarefa(text=str(linha[2])))
 			box.add_widget(Tarefa(text=str(linha[3])+'s'))
-			contador+=1
-			
+			contador += 1
+
 			self.ids.box.add_widget(box)
 		self.ids.scroll.scroll_to(box)
 		self.ids.action.parent.remove_widget((self.ids.action))
@@ -703,7 +706,7 @@ class Ranking(Screen):
 		self.limpatela()
 
 
-	def limpatela(self,*args):#botao recomecar, limpa a tela e cria uma nova tela		
+	def limpatela(self,*args):#botao recomecar, limpa a tela e cria uma nova tela       
 		self.parent.remove_widget(self)
 		teste = Ranking(name='ranking')
 		self.parent.add_widget(teste)
@@ -755,13 +758,15 @@ class Pergunta(BoxLayout):
 	pontos = 0
 	selec = 0
 	tempo = 0
-	fechar = []
+	quiz_fechar = []
+	quiz_final = 0
+	quiz_nome = ''
 
 	def __init__(self,pergunta='',args = ["","","","","","","","",""],id=0,**kwargs):
 		
 		super(Pergunta,self).__init__(**kwargs)
 		# for key,val in self.ids.items():
-		# 	print("key={0}, val={1}".format(key,val))
+		#   print("key={0}, val={1}".format(key,val))
 		self.ids.perg.text = pergunta
 		self.ref = id
 		
@@ -780,19 +785,20 @@ class Pergunta(BoxLayout):
 		self.ids.r4.text = args[6]
 		self.ids.r40.flag = args[7]
 		self.ids.r40.group = str(args[8])
+
+		
+		
 	def clear(self):
-		print("LIMPANDO")		
+		print("LIMPANDO")       
 		self.__class__.pontos = 0
 		self.__class__.selec = 0
 		self.__class__.tempo = 0
 		self.__class__.fechar = []
-	def guardabanco_t(self):#da pra usar o on_dismiss
-		global quiz_nome,quiz_inicial,quiz_final,quiz_pontos
-
-		tempo = ('{:.2f}'.format(quiz_final - quiz_inicial))
+	def guardabanco_t(self, *args):		#	da pra usar o on_dismiss
 		
+		self = Pergunta()		#	self estava sendo um Button resultando em um erro
 		
-		if(quiz_nome == ''):
+		if(self.__class__.quiz_nome == ''):
 			print("Nenhum nome salvo")
 			banco = sqlite3.connect('quiz.db')
 			c = banco.cursor()
@@ -801,26 +807,24 @@ class Pergunta(BoxLayout):
 
 
 		else:
-			print("Salvo no banco de dados quiz = "+str(quiz_nome)+' '+str(tempo))
+			print("Salvo no banco de dados quiz = "+str(self.__class__.quiz_nome)+' '+str(self.__class__.tempo))
 			
 			banco = sqlite3.connect('quiz.db')
 			c = banco.cursor()
-			c.execute("UPDATE rank SET nome = ?  WHERE nome = '&&&marca&&&';",[quiz_nome])
+			c.execute("UPDATE rank SET nome = ?  WHERE nome = '&&&marca&&&';",[self.__class__.quiz_nome])
 			banco.commit()
 
-			quiz_nome = ''
+			self.__class__.quiz_nome = ''
 			self.__class__.tempo = 0
-			tempo = 0
-			quiz_pontos = 0
+			Quiz().setQuiz_pontos(0)
 			
 	def pop(self,*args):
-		global quiz_final, quiz_inicial,quiz_pontos,quiz_fechar
 
 		banco = sqlite3.connect('quiz.db')
 		c = banco.cursor()
 		c.execute('''CREATE TABLE IF NOT EXISTS rank (nome text,pontos integer,tempo real)''')
 		
-		c.execute("INSERT into rank (nome,pontos,tempo) values (?,?,?);",['&&&marca&&&',quiz_pontos,self.tempo])
+		c.execute("INSERT into rank (nome,pontos,tempo) values (?,?,?);",['&&&marca&&&',Quiz().getQuiz_pontos(),self.tempo])
 	
 		
 		c.execute("CREATE TEMP TABLE tmp_rank AS SELECT nome,pontos,tempo FROM rank ORDER BY pontos desc, tempo asc")
@@ -878,7 +882,7 @@ class Pergunta(BoxLayout):
 			if(tupla[1] == '&&&marca&&&'):
 				box.add_widget(Tarefa_two(text=str(tupla[0])))#posica
 				box.add_widget(Inserenome2())#nome
-				box.add_widget(Tarefa_two(text=str(quiz_pontos)))#pontos
+				box.add_widget(Tarefa_two(text=str(Quiz().getQuiz_pontos())))#pontos
 				box.add_widget(Tarefa_two(text=str(self.tempo)+'s'))#tempo(real)
 				save = box
 			else:
@@ -892,8 +896,9 @@ class Pergunta(BoxLayout):
 
 		pop.ids.scroll.scroll_to(save)
 		b2 = BoxLayoutCustom2(orientation='vertical',cor=(1,1,1,0))
-		quiz_fechar = Botao_custom(text='Fechar Popup',on_press = Pergunta.guardabanco_t ,on_release=pop.dismiss) 
-		b2.add_widget(quiz_fechar)
+		self.__class__.quiz_fechar = Botao_custom(text='Fechar',on_press = Pergunta.guardabanco_t ,on_release=pop.dismiss) 
+		self.__class__.quiz_fechar.rgba = [0,0.20,0,1]
+		b2.add_widget(self.__class__.quiz_fechar)
 		pop.ids.box.add_widget(b2)
 		
 		#anim = Animation(size_hint=(1,1),duration=1,t='out_back')
@@ -905,17 +910,19 @@ class Pergunta(BoxLayout):
 		Clock.schedule_once(pop.open, 0.5)
 
 	def verifica(self,flag):
-		global quiz_final,quiz_inicial,quiz_pontos
 		
 		Clock.schedule_once(lambda dt:Quiz().mov(id =self.ref,arg = self),0.4)
 		
 		self.__class__.selec+=1
 		if(flag):
 			print("Acertou")
-			quiz_pontos+=1
+			self.rgba = [0,0.8,0,1]
+			Quiz().setQuiz_pontos(valor = Quiz().getQuiz_pontos()+1)
 			
 		else:
+			self.rgba = [0.35,0,0,1]
 			print("errou")
+
 		for child in self.children:
 			
 			flag = 0
@@ -927,16 +934,29 @@ class Pergunta(BoxLayout):
 						flag = 1
 				if(flag == 1):
 					if(child1.name == 'label'):
-						child1.color = 0.12,0.5,0,1
+						child1.color = 0.12, 0.5, 0, 1
 						flag = 0
-		if(self.selec == 5): 
-			quiz_final = time.time() 
-			self.__class__.tempo = ('{:.2f}'.format(quiz_final - quiz_inicial))
-			self.__class__.selec=0
+		if(self.selec == 5):
+			self.__class__.quiz_final = time.time()
+			self.__class__.tempo = ('{:.2f}'.format(self.__class__.quiz_final - Quiz().getQuiz_inicial()))
+			self.__class__.selec = 0
 			# a = Thread(target = self.pop, args = [])
 			# a.start()
-			Clock.schedule_once(lambda dt:self.pop(),0.1)
-		
+			Clock.schedule_once(lambda dt: self.pop(), 0.1)
+	
+	def setQuiz_nome(self, nome = ''):
+		self.__class__.quiz_nome = nome
+
+	def getQuiz_nome(self):
+		return self.__class__.quiz_nome
+
+	def setQuiz_fechar(self,valor=0):
+		self.__class__.quiz_fechar = valor
+
+	def getQuiz_fechar(self, *args):
+		return self.__class__.quiz_fechar
+
+
 class InserenomeMemory(BoxLayout):
 	
 	def __init__(self,**kwargs):
@@ -952,29 +972,31 @@ class InserenomeMemory(BoxLayout):
 	def redmensiona(self):#teclado abaixo do textinput
 		Window.softinput_mode = 'below_target'
 	def finishScroll(self,scroll):
-		global Memo_fechar
-		Clock.schedule_once(lambda dt: scroll.scroll_to(Memo_fechar),0.5)#move o scrollview ate o botao fechar
+		Clock.schedule_once(lambda dt: scroll.scroll_to(ImageButton().getMemo_fechar()),0.5)#move o scrollview ate o botao fechar
 
 class Inserenome2(BoxLayout):
 	nome = ''
+	
 	def __init__(self,**kwargs):
 		super(Inserenome2,self).__init__(**kwargs)
+	
 	def salvanome(self):
-		global quiz_nome
+		
 		if (len(self.ids.texinp.text) != 0):
 
 			self.nome = self.ids.texinp.text
-			quiz_nome = self.nome
+			Pergunta().setQuiz_nome(nome=self.nome)
 			self.ids.box1.add_widget(Tarefa_two(text=self.nome))
 		else:
 			self.ids.box1.add_widget(Tarefa_two(text=':/'))
 
 	def redmensiona(self):#teclado abaixo do textinput
 		Window.softinput_mode = 'below_target'
+	
 	def finishScroll(self,scroll):
-		global quiz_fechar
+		Clock.schedule_once(lambda dt: scroll.scroll_to(Pergunta().getQuiz_fechar(),0.5))#move o scrollview ate o botao fechar
 
-		Clock.schedule_once(lambda dt: scroll.scroll_to(quiz_fechar),0.5)#move o scrollview ate o botao fechar
+
 class Popcustom(Popup):
 	def __init__(self,**kwargs):
 		super(Popcustom,self).__init__(**kwargs)
@@ -988,6 +1010,18 @@ class Novo(App):
 	def build(self):
 		self.title = 'Muhna'
 		self.icon = 'imagens/pergunta.png'
+		Clock.max_iteration = 50
+
+		banco = sqlite3.connect('quiz.db')
+		c = banco.cursor()
+		c.execute("DELETE FROM rank WHERE nome like '&&&marca&&&';")
+		banco.commit()
+
+		banco = sqlite3.connect('teste.db')
+		c = banco.cursor()
+		c.execute("DELETE FROM rank WHERE nome like '&&&marca&&&';")
+		banco.commit()
+
 
 		return Gerenciador()
 	
