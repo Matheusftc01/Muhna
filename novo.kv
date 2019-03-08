@@ -35,10 +35,10 @@
 			on_release:
 				app.root.current='quiz'
 				
-		Botao:
-			id:button4
-			text:'Placar'
-			on_release:app.root.current='ranking'
+		# Botao:
+		# 	id:button4
+		# 	text:'Placar'
+		# 	on_release:app.root.current='ranking'
 
 <Botao@ButtonBehavior+LabelBotao>:
 	pos_hint: {'center_x':.5,'center_y':.5}
@@ -186,9 +186,10 @@
 <Pergunta>:
 	orientation:'vertical'
 	id:pergunta
+	rgba:0,0,0,.4
 	canvas.before:
 		Color:
-			rgba:0,0,0,.4
+			rgba:self.rgba
 		# Rectangle:
 		# 	pos:self.pos
 		# 	size:self.size
@@ -359,14 +360,14 @@
 					size_hint_x:.5
 					pos_hint:{'center_x':.5,'center_y':.5}
 					height:'70dp'
-					text:'Clique para iniciar novo jogo'
+					text:'Clique para iniciar o novo jogo'
 					on_release:
 						#root.ids.qz.remove_widget(root.ids.bt)
 						#root.ids.qz.remove_widget(root.ids.qf)
 						#root.ids.qz.remove_widget(root.ids.qg)
 						root.desconstroi()
-						root.constroi()
-						#root.carregaWidgets()
+						#root.constroi()
+						root.carregaWidgets()
 				BoxLayout:
 					id:qg
 					orientation:'vertical'
@@ -395,7 +396,7 @@
 	text:''
 	source: 'imagens/pergunta.png'
 	on_press:
-	on_release:root.troca(str(self.text))#root.conta(str(self.text))
+	on_release:root.troca(str(self.text))
 
 <Roundedbotao@ButtonBehavior+LabelBotao>:
 	pos_hint: {'center_x':.5,'center_y':.5}
@@ -595,22 +596,12 @@
 			on_release:
 				root.salvanome()
 				root.finishScroll(scroll = self.parent.parent.parent.parent.parent)
-				# print(self)
-				# print(self.parent)
-				# print(self.parent.parent)
-				# print(self.parent.parent.parent)
-				# print(self.parent.parent.parent.parent)
-				# print(self.parent.parent.parent.parent.parent)
-				# print(self.parent.parent.parent.parent.parent.parent)
-				# print(self.parent.parent.parent.parent.parent.parent.parent)
-
-
 				root.ids.box1.remove_widget(root.ids.texinp)
 				root.ids.box2.remove_widget(root.ids.bt)
 
 			canvas.before:
 				Color:
-					rgba:0,0,0,1
+					rgba:0,0.20,0,1
 				RoundedRectangle:
 					pos:self.pos
 					size:self.size
@@ -649,7 +640,7 @@
 
 			canvas.before:
 				Color:
-					rgba:0,0,0,1
+					rgba:0,0.20,0,1
 				RoundedRectangle:
 					pos:self.pos
 					size:self.size
@@ -658,9 +649,10 @@
 <Botao_custom@ButtonBehavior+LabelBotao>:
 	pos_hint: {'center_x':.5,'center_y':.5}
 	size_hint:1,1
+	rgba:0.30,0.14,0,.4
 	canvas.before:
 		Color:
-			rgba:0.30,0.14,0,.4 #marrom 77/255,38/255,0,1 #azul 0.1,0.5,0.7,1
+			rgba:self.rgba #marrom 77/255,38/255,0,1 #azul 0.1,0.5,0.7,1
 		RoundedRectangle:
 			pos:self.pos
 			size:self.size
